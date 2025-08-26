@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
+import styles from './mainMenu.module.scss';
 
 interface MainMenuProps {}
 
@@ -11,20 +12,16 @@ const MainMenu: FC<MainMenuProps> = () => {
   };
 
   return (
-    <div className="main-menu">
+    <div className={styles.mainMenu}>
       <h1>Roadrunner</h1>
       <h2>Симулятор внедорожника</h2>
       
-      <div className="menu-buttons">
+      <div className={styles.menuButtons}>
         <button 
-          className="start-button" 
+          className={styles.startButton} 
           onClick={handleStartGame}
         >
           Начать игру
-        </button>
-        
-        <button className="options-button">
-          Настройки
         </button>
       </div>
     </div>
