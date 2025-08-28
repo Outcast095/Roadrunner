@@ -30,7 +30,7 @@ const Vehicle: FC<VehicleProps> = ({ position }) => {
     <primitive 
       object={clonedScene} 
       position={position}
-      scale={[0.5, 0.5, 0.5]} // Масштабируем модель для соответствия сцене
+      scale={[10, 10, 10]} // Масштабируем модель для соответствия сцене
       castShadow // Модель будет отбрасывать тень
       receiveShadow // Модель будет принимать тени
     />
@@ -117,7 +117,7 @@ const GameScene: FC<GameSceneProps> = () => {
               </mesh>            
 
               {/* Модель автомобиля */}
-              <Vehicle position={[0, 0.2, 5]} />
+              <Vehicle position={[0, 4, 5]} />
 
             </Physics>
             
