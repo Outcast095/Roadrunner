@@ -7,7 +7,9 @@ import { Canvas } from '@react-three/fiber';
 // Импортируем вспомогательные компоненты из библиотеки drei для улучшения 3D-сцены
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei';
 // Импортируем физический движок для симуляции физики в 3D-мире
-import { Physics } from '@react-three/rapier';
+import { Physics, RigidBody } from '@react-three/rapier';
+// Явно импортируем WASM-модуль Rapier для инициализации
+import '@dimforge/rapier3d-compat';
 // Импортируем стили для компонента
 import styles from './gameScene.module.scss';
 
@@ -30,7 +32,7 @@ const Vehicle: FC<VehicleProps> = ({ position }) => {
     <primitive 
       object={clonedScene} 
       position={position}
-      scale={[0.5, 0.5, 0.5]} // Масштабируем модель для соответствия сцене
+      scale={[10, 10, 10]} // Масштабируем модель для соответствия сцене
       castShadow // Модель будет отбрасывать тень
       receiveShadow // Модель будет принимать тени
     />
@@ -105,19 +107,22 @@ const GameScene: FC<GameSceneProps> = () => {
               {/* Здесь будут компоненты внедорожника, местности и препятствий */}
               
               {/* Создаем плоскость для земли */}
-              <mesh 
-                rotation={[-Math.PI / 2, 0, 0]} // Поворачиваем плоскость горизонтально (по оси X)
-                position={[0, 0, 0]} // Позиция в центре сцены
-                receiveShadow // Плоскость будет принимать тени от других объектов
-              >
-                {/* Геометрия плоскости размером 100x100 единиц */}
-                <planeGeometry args={[100, 100]} />
-                {/* Материал плоскости с зеленым цветом (трава) */}
-                <meshStandardMaterial color="#4a7023" />
-              </mesh>            
+              <RigidBody type="fixed" position={[0, 0, 0]}>
+                <mesh 
+                  rotation={[-Math.PI / 2, 0, 0]} // Поворачиваем плоскость горизонтально (по оси X)
+                  receiveShadow // Плоскость будет принимать тени от других объектов
+                >
+                  {/* Геометрия плоскости размером 100x100 единиц */}
+                  <planeGeometry args={[100, 100]} />
+                  {/* Материал плоскости с зеленым цветом (трава) */}
+                  <meshStandardMaterial color="#4a7023" />
+                </mesh>
+              </RigidBody>            
 
               {/* Модель автомобиля */}
-              <Vehicle position={[0, 0.2, 5]} />
+              <RigidBody position={[0, 0.2, 5]} colliders="hull">
+                <Vehicle position={[4, 4, 4]} />
+              </RigidBody>
 
             </Physics>
             
