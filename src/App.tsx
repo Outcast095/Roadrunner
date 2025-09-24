@@ -1,17 +1,32 @@
-import { Routes, Route } from 'react-router-dom'
-import './App.css'
+import React, { useState } from 'react';
+import { MenuPage, GameplayPage } from './pages';
+import './App.css';
 
-// Импорт компонентов
-import MainMenu from './components/ui/MainMenu'
-import GameScene from './scenes/GameScene'
+/**
+ * App - Главный компонент приложения Roadrunner
+ * Управляет навигацией между страницами
+ */
+const App: React.FC = () => {
+  const [currentPage, setCurrentPage] = useState<'menu' | 'gameplay'>('menu');
 
-const App = () => {
+  const handleNavigateToGameplay = () => {
+    setCurrentPage('gameplay');
+  };
+
+  const handleNavigateToMenu = () => {
+    setCurrentPage('menu');
+  };
+
   return (
-    <Routes>
-      <Route path="/" element={<MainMenu />} />
-      <Route path="/game" element={<GameScene />} />
-    </Routes>
-  )
-}
+    <div className="app">
+      {currentPage === 'menu' && (
+        <MenuPage onStartGame={handleNavigateToGameplay} />
+      )}
+      {currentPage === 'gameplay' && (
+        <GameplayPage onBackToMenu={handleNavigateToMenu} />
+      )}
+    </div>
+  );
+};
 
-export default App
+export default App;

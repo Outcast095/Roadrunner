@@ -1,0 +1,153 @@
+// SCSS Variables for Roadrunner game
+// Цвета, размеры, и другие константы
+
+// === COLOR PALETTE ===
+// Primary colors
+$color-primary: #ff6b35;      // Orange (main accent)
+$color-secondary: #004643;    // Dark teal
+$color-accent: #f9bc60;       // Yellow accent
+
+// Neutral colors
+$color-white: #ffffff;
+$color-black: #000000;
+$color-dark: #1a1a1a;
+$color-light: #f5f5f5;
+
+// Gray scale
+$color-gray-100: #f8f9fa;
+$color-gray-200: #e9ecef;
+$color-gray-300: #dee2e6;
+$color-gray-400: #ced4da;
+$color-gray-500: #adb5bd;
+$color-gray-600: #6c757d;
+$color-gray-700: #495057;
+$color-gray-800: #343a40;
+$color-gray-900: #212529;
+
+// Game-specific colors
+$color-fuel-full: #28a745;    // Green
+$color-fuel-low: #ffc107;     // Yellow
+$color-fuel-critical: #dc3545; // Red
+$color-speed-normal: #17a2b8; // Blue
+$color-speed-high: #fd7e14;   // Orange
+$color-speed-max: #e83e8c;    // Pink
+
+// === TYPOGRAPHY ===
+$font-family-primary: 'Inter', system-ui, -apple-system, sans-serif;
+$font-family-secondary: 'JetBrains Mono', 'Consolas', monospace;
+$font-family-display: 'Orbitron', 'Inter', sans-serif;
+
+// Font sizes
+$font-size-xs: 0.75rem;   // 12px
+$font-size-sm: 0.875rem;  // 14px
+$font-size-md: 1rem;      // 16px
+$font-size-lg: 1.125rem;  // 18px
+$font-size-xl: 1.25rem;   // 20px
+$font-size-2xl: 1.5rem;   // 24px
+$font-size-3xl: 1.875rem; // 30px
+$font-size-4xl: 2.25rem;  // 36px
+
+// Font weights
+$font-weight-light: 300;
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+$font-weight-black: 900;
+
+// === SPACING ===
+$spacing-xs: 0.25rem;  // 4px
+$spacing-sm: 0.5rem;   // 8px
+$spacing-md: 1rem;     // 16px
+$spacing-lg: 1.5rem;   // 24px
+$spacing-xl: 2rem;     // 32px
+$spacing-2xl: 3rem;    // 48px
+$spacing-3xl: 4rem;    // 64px
+
+// === BORDERS ===
+$border-width: 1px;
+$border-width-thick: 2px;
+$border-style: solid;
+
+$border-radius-sm: 0.25rem;  // 4px
+$border-radius-md: 0.375rem; // 6px
+$border-radius-lg: 0.5rem;   // 8px
+$border-radius-xl: 0.75rem;  // 12px
+$border-radius-full: 9999px;
+
+// === SHADOWS ===
+$shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+$shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+$shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+$shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+// === Z-INDEX ===
+$z-index-dropdown: 1000;
+$z-index-modal: 1050;
+$z-index-popover: 1060;
+$z-index-tooltip: 1070;
+$z-index-loading: 1080;
+$z-index-debug: 9999;
+
+// === BREAKPOINTS ===
+$breakpoint-xs: 0;
+$breakpoint-sm: 576px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 992px;
+$breakpoint-xl: 1200px;
+$breakpoint-2xl: 1400px;
+
+// === TRANSITIONS ===
+$transition-fast: 150ms ease-in-out;
+$transition-normal: 250ms ease-in-out;
+$transition-slow: 400ms ease-in-out;
+
+// Specific transition properties
+$transition-color: color $transition-fast;
+$transition-background: background-color $transition-fast;
+$transition-border: border-color $transition-fast;
+$transition-transform: transform $transition-normal;
+$transition-opacity: opacity $transition-normal;
+
+// === GAME-SPECIFIC ===
+// HUD sizes
+$hud-speedometer-size: 120px;
+$hud-fuel-gauge-width: 200px;
+$hud-fuel-gauge-height: 20px;
+$hud-minimap-size: 150px;
+
+// Vehicle stats colors
+$rpm-safe: $color-fuel-full;
+$rpm-warning: $color-fuel-low;
+$rpm-danger: $color-fuel-critical;
+
+// UI element sizes
+$button-height-sm: 32px;
+$button-height-md: 40px;
+$button-height-lg: 48px;
+
+$input-height-sm: 32px;
+$input-height-md: 40px;
+$input-height-lg: 48px;
+
+// === CSS CUSTOM PROPERTIES MAPPING ===
+// Эти переменные будут использоваться для создания CSS custom properties
+:root {
+  // Colors
+  --color-primary: #{$color-primary};
+  --color-secondary: #{$color-secondary};
+  --color-accent: #{$color-accent};
+  
+  // Spacing
+  --spacing-sm: #{$spacing-sm};
+  --spacing-md: #{$spacing-md};
+  --spacing-lg: #{$spacing-lg};
+  
+  // Borders
+  --border-radius-md: #{$border-radius-md};
+  --border-radius-lg: #{$border-radius-lg};
+  
+  // Transitions
+  --transition-fast: #{$transition-fast};
+  --transition-normal: #{$transition-normal};
+}

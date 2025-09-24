@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run lint-staged for pre-commit checks
+npx lint-staged
+
+# Additional 3D-specific checks
+echo "🎮 Running 3D development checks..."
+
+# Check 3D files for memory management
+npx eslint "**/*3d*" "**/*webgl*" "**/*three*" "**/shaders/**/*" "**/scenes/**/*" --max-warnings 0
+
+# Format 3D files
+npx prettier --write "**/*3d*" "**/*webgl*" "**/*three*" "**/shaders/**/*" "**/scenes/**/*"
+
+echo "✅ 3D development checks passed!"

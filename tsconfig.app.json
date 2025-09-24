@@ -1,13 +1,15 @@
 {
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    
+    /* Modern TypeScript Target */
     "target": "ES2022",
-    "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
     "module": "ESNext",
+    "useDefineForClassFields": true,
     "skipLibCheck": true,
 
-    /* Bundler mode */
+    /* Bundler mode for Vite */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
@@ -15,13 +17,77 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting */
+    /* Module Resolution */
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+
+    /* Path mapping - Context7 best practices */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/types": ["src/types"],
+      "@/types/*": ["src/types/*"],
+      "@/components": ["src/components"],
+      "@/components/*": ["src/components/*"],
+      "@/utils": ["src/utils"],
+      "@/utils/*": ["src/utils/*"],
+      "@/assets": ["src/assets"],
+      "@/assets/*": ["src/assets/*"],
+      "@/store": ["src/store"],
+      "@/store/*": ["src/store/*"],
+      "@/hooks": ["src/hooks"],
+      "@/hooks/*": ["src/hooks/*"]
+    },
+
+    /* Type checking - Context7 strict configuration */
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "types": ["node"],
+
+    /* Strict Mode - Context7 recommended settings */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noUncheckedSideEffectImports": false,
+
+    /* Code Quality */
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": false,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+
+    /* Advanced Type Checking */
+    "noPropertyAccessFromIndexSignature": false,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": true,
+
+    /* Performance */
+    "incremental": true,
+    "composite": false
   },
-  "include": ["src"]
+  "include": [
+    "src/**/*",
+    "src/types/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
+  ]
 }
