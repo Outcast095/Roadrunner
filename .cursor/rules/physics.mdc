@@ -1,0 +1,9 @@
+---
+description: основные треботвания к физике мира и автомобиля 
+globs:
+alwaysApply: true
+---
+
+
+все правила создания физики внешнего мира @docs/WorldPhysics.md
+все правила создания физики автомобиля @docs/CarPhysics.md

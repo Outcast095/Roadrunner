@@ -1,10 +1,8 @@
-import React, { useEffect, useRef } from 'react';
-import { Space, Engine, Scene, ArcRotateCamera, HemisphericLight, Vector3, MeshBuilder, StandardMaterial, Color3, DirectionalLight, ShadowGenerator, KeyboardEventTypes, type AbstractMesh } from '@babylonjs/core';
-import { PhysicsSystem, PhysicsBodyFactory } from '../utils/physics';
+import React, { useEffect, useRef, useState } from 'react';
+import { Engine, Scene, ArcRotateCamera, HemisphericLight, Vector3, MeshBuilder, StandardMaterial, Color3, DirectionalLight, ShadowGenerator, KeyboardEventTypes, type AbstractMesh } from '@babylonjs/core';
+import { PhysicsSystem, PhysicsBodyFactory, OffroadVehicleConfigFactory, VehiclePhysicsSystem } from '../utils/physics';
 import './GameplayPage.scss';
 
-
-// Browser API types for ESLint
 declare const window: {
   addEventListener: (event: string, handler: () => void) => void;
   removeEventListener: (event: string, handler: () => void) => void;
@@ -14,21 +12,97 @@ type GameplayPageProps = {
   onBackToMenu: () => void;
 }
 
-/**
- * GameplayPage - Основная игровая страница Roadrunner
- * Содержит 3D сцену, HUD и игровые элементы
- */
 const GameplayPage: React.FC<GameplayPageProps> = ({ onBackToMenu }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const sceneRef = useRef<Scene | null>(null);
   const physicsSystemRef = useRef<PhysicsSystem | null>(null);
   const physicsBodyFactoryRef = useRef<PhysicsBodyFactory | null>(null);
+  const vehiclePhysicsSystemRef = useRef<VehiclePhysicsSystem | null>(null);
+  const vehicleIdRef = useRef<string | null>(null);
+  const [isPhysicsReady, setIsPhysicsReady] = useState(false);
+  const [isVehicleReady, setIsVehicleReady] = useState(false);
+
+  // Функции для создания физических объектов
+  const createVehiclePhysics = () => {
+    if (!vehiclePhysicsSystemRef.current || !sceneRef.current || !physicsSystemRef.current) {
+      return;
+    }
+
+    try {
+      const body = sceneRef.current.getMeshByName('body');
+      const wheelFL = sceneRef.current.getMeshByName('wheelFL');
+      const wheelFR = sceneRef.current.getMeshByName('wheelFR');
+      const wheelBL = sceneRef.current.getMeshByName('wheelBL');
+      const wheelBR = sceneRef.current.getMeshByName('wheelBR');
+
+      if (!body || !wheelFL || !wheelFR || !wheelBL || !wheelBR) {
+        return;
+      }
+
+      const vehicleConfig = OffroadVehicleConfigFactory.createOffroadConfig();
+      vehicleIdRef.current = vehiclePhysicsSystemRef.current.createVehicle(body, [wheelFL, wheelFR, wheelBL, wheelBR], vehicleConfig);
+      
+      // Регистрируем автомобиль в PhysicsSyncSystem для синхронизации
+      if (vehicleIdRef.current && physicsSystemRef.current) {
+        const vehicle = vehiclePhysicsSystemRef.current.getVehicle(vehicleIdRef.current);
+        if (vehicle && vehicle.body) {
+          physicsSystemRef.current.registerPhysicsObject(vehicleIdRef.current, vehicle.body, vehicle.vehicle);
+        }
+      }
+      
+      setIsVehicleReady(true);
+    } catch (error) {
+      console.error('❌ Error creating vehicle physics:', error);
+      setIsVehicleReady(false);
+    }
+  };
+
+  const createPhysicsBodies = () => {
+    if (!physicsBodyFactoryRef.current || !physicsSystemRef.current || !sceneRef.current) {
+      return;
+    }
+
+    try {
+      const ground = sceneRef.current.getMeshByName('ground');
+      const redCylinder = sceneRef.current.getMeshByName('redCylinder');
+
+      if (!ground || !redCylinder) {
+        return;
+      }
+
+      const groundPhysicsBody = physicsBodyFactoryRef.current.createGroundBody(ground, {
+        friction: 0.8,
+        restitution: 0.1,
+        collisionGroup: 1,
+        collisionMask: 6,
+        material: { friction: 0.8, restitution: 0.1, rollingFriction: 0.1, spinningFriction: 0.1 }
+      });
+
+      const cylinderPhysicsBody = physicsBodyFactoryRef.current.createCylinderBody(redCylinder, {
+        mass: 15,
+        friction: 0.7,
+        restitution: 0.4,
+        linearDamping: 0.1,
+        angularDamping: 0.1,
+        collisionGroup: 2,  // Группа 2 для динамических объектов
+        collisionMask: 1,   // Может сталкиваться с группой 1 (земля)
+        material: { friction: 0.7, restitution: 0.4, rollingFriction: 0.2, spinningFriction: 0.2 }
+      });
+
+      physicsSystemRef.current.registerPhysicsObject(groundPhysicsBody.id, ground, groundPhysicsBody.rigidBody);
+      physicsSystemRef.current.registerPhysicsObject(cylinderPhysicsBody.id, redCylinder, cylinderPhysicsBody.rigidBody);
+    } catch (error) {
+      console.error('❌ Error creating physics bodies:', error);
+    }
+  };
 
   useEffect(() => {
-    if (!canvasRef.current) { return; }
+    if (!canvasRef.current) {
+      console.error('❌ Canvas ref is null');
+      return;
+    }
 
-    // Create Babylon.js engine
     const engine = new Engine(canvasRef.current, true, {
       preserveDrawingBuffer: true,
       stencil: true,
@@ -36,18 +110,26 @@ const GameplayPage: React.FC<GameplayPageProps> = ({ onBackToMenu }) => {
       alpha: false,
       premultipliedAlpha: false,
       powerPreference: 'high-performance',
+      failIfMajorPerformanceCaveat: false,
+      depth: true,
     });
     engineRef.current = engine;
 
-    // Create scene
     const scene = new Scene(engine);
     sceneRef.current = scene;
 
-    // Initialize physics system
+    // Проверка поддержки WebGL
+    if (!Engine.isSupported) {
+      console.error('❌ WebGL not supported');
+      return;
+    }
+
     const initializePhysics = async () => {
       try {
         const physicsSystem = new PhysicsSystem({
-          gravity: { x: 0, y: -9.8, z: 0 },
+          gravity: { x: 0, y: -9.81, z: 0 },
+          timeStep: 1/60,
+          maxSubSteps: 10,
           updateConfig: {
             fixedTimeStep: 1/60,
             maxSubSteps: 10,
@@ -56,7 +138,7 @@ const GameplayPage: React.FC<GameplayPageProps> = ({ onBackToMenu }) => {
             enableSleeping: true,
             sleepThreshold: 0.1,
             enableCaching: true,
-            debugMode: false,
+            debugMode: true,
             logPerformance: false,
             maxLogFrequency: 1000
           },
@@ -68,39 +150,29 @@ const GameplayPage: React.FC<GameplayPageProps> = ({ onBackToMenu }) => {
             enableCaching: true,
             maxCacheSize: 1000,
             updateFrequency: 60,
-            debugMode: false,
-            logSyncErrors: false
+            debugMode: true,
+            logSyncErrors: true
           }
         });
-        
+
         await physicsSystem.initialize();
         physicsSystem.start();
-        physicsSystemRef.current = physicsSystem;
         
-        // Create physics body factory
-        const physicsBodyFactory = new PhysicsBodyFactory(physicsSystem.getPhysicsManager());
-        physicsBodyFactoryRef.current = physicsBodyFactory;
+        physicsSystemRef.current = physicsSystem;
+        physicsBodyFactoryRef.current = new PhysicsBodyFactory(physicsSystem.getPhysicsManager());
+        vehiclePhysicsSystemRef.current = new VehiclePhysicsSystem(physicsSystem.getPhysicsManager());
+        
+        setIsPhysicsReady(true);
       } catch (error) {
-        console.error('❌ Ошибка инициализации физики:', error);
+        console.error('❌ Error initializing physics system:', error);
+        setIsPhysicsReady(false);
       }
     };
 
-    // Initialize physics
-    initializePhysics();
-
-    // Create camera
-    const camera = new ArcRotateCamera(
-      'camera',
-      -Math.PI / 2,
-      Math.PI / 2.5,
-      10,
-      Vector3.Zero(),
-      scene,
-    );
+    const camera = new ArcRotateCamera('camera', -Math.PI / 2, Math.PI / 2.5, 50, Vector3.Zero(), scene);
     camera.attachControl(canvasRef.current, true);
     camera.setTarget(Vector3.Zero());
 
-    // Create lighting
     const hemisphericLight = new HemisphericLight('hemisphericLight', new Vector3(0, 1, 0), scene);
     hemisphericLight.intensity = 0.7;
 
@@ -108,295 +180,183 @@ const GameplayPage: React.FC<GameplayPageProps> = ({ onBackToMenu }) => {
     directionalLight.position = new Vector3(20, 40, 20);
     directionalLight.intensity = 0.5;
 
-    // Create ground plane
-    const ground = MeshBuilder.CreateGround('ground', { width: 20, height: 20 }, scene);
-    const groundMaterial = new StandardMaterial('groundMaterial', scene);
-    groundMaterial.diffuseColor = new Color3(0.2, 0.6, 0.2); // Green color
-    groundMaterial.specularColor = new Color3(0.1, 0.1, 0.1);
-    ground.material = groundMaterial;
-
-    // Create shadow generator
     const shadowGenerator = new ShadowGenerator(1024, directionalLight);
     shadowGenerator.useExponentialShadowMap = true;
 
-    // Create custom vehicle model
-    let vehicle: AbstractMesh | null = null;
-
-    // Кузов (прямоугольный бокс)
-    const body = MeshBuilder.CreateBox('body', {
-      width: 2,  // Длина
-      height: 1, // Высота
-      depth: 4.5,   // Ширина
-    }, scene);
-    body.position.y = 1; // Над землёй
-    body.position.x = 2;
+    const body = MeshBuilder.CreateBox('body', { width: 1.8, height: 1.6, depth: 4.2 }, scene); // Компактный внедорожник
+    body.position.y = 20.0; // Поднимаем автомобиль на 20 метров для тестирования гравитации
+    body.position.x = 0;
     body.position.z = 0;
-    body.rotation.y = 0; // Поворачиваем автомобиль на 90 градусов
+    body.rotation.y = 0;
+    body.rotation.x = 0;
+    body.rotation.z = 0;
+    
 
-    // Материал для кузова
     const bodyMaterial = new StandardMaterial('bodyMat', scene);
-    bodyMaterial.diffuseColor = new Color3(0.2, 0.5, 0.8); // Синий цвет
+    bodyMaterial.diffuseColor = new Color3(0.2, 0.5, 0.8);
+    bodyMaterial.specularColor = new Color3(0.1, 0.1, 0.1);
+    bodyMaterial.roughness = 0.8;
     body.material = bodyMaterial;
+    
 
-    // Колёса (четыре цилиндра)
-    const wheelRadius = 0.5;
-    const wheelWidth = 0.3;
+    const wheelRadius = 0.45; // 45см радиус (в пределах 0.4-0.5м)
+    const wheelWidth = 0.25;  // 25см ширина (в пределах 0.2-0.3м)
+    
 
-    // Переднее левое колесо
-    const wheelFL = MeshBuilder.CreateCylinder('wheelFL', {
-      diameter: wheelRadius * 2,
-      height: wheelWidth,
-      tessellation: 24, // Для гладкости
-    }, scene);
-    wheelFL.rotation.z = Math.PI / 2; // Поворот на 90 градусов по Z-оси
-    wheelFL.position = new Vector3(0.7, 0.5, 1.2); // Позиция ближе к кузову
-    wheelFL.setParent(body); // Прикрепить к кузову
+    const wheelFL = MeshBuilder.CreateCylinder('wheelFL', { diameter: wheelRadius * 2, height: wheelWidth, tessellation: 24 }, scene);
+    wheelFL.rotation.z = Math.PI / 2;
+    wheelFL.setParent(body);
+    wheelFL.position = new Vector3(0.7, -0.8, -1.5);
 
-    // заднее левое колесо
-    const wheelFR = MeshBuilder.CreateCylinder('wheelFR', {
-      diameter: wheelRadius * 2,
-      height: wheelWidth,
-      tessellation: 24,
-    }, scene);
-    wheelFR.rotation.z = Math.PI / 2; // Поворот на 90 градусов по Z-оси
-    wheelFR.position = new Vector3(3.5, 0.5, 1.2);
+    const wheelFR = MeshBuilder.CreateCylinder('wheelFR', { diameter: wheelRadius * 2, height: wheelWidth, tessellation: 24 }, scene);
+    wheelFR.rotation.z = Math.PI / 2;
     wheelFR.setParent(body);
+    wheelFR.position = new Vector3(-0.7, -0.8, -1.5);
 
-    // Заднее правое колесо синее колесо
-    const wheelBL = MeshBuilder.CreateCylinder('wheelBL', {
-      diameter: wheelRadius * 2,
-      height: wheelWidth,
-      tessellation: 24,
-    }, scene);
-    wheelBL.rotation.z = Math.PI / 2; // Поворот на 90 градусов по Z-оси
-    wheelBL.position = new Vector3(3.5, 0.5, -1.2);
+    const wheelBL = MeshBuilder.CreateCylinder('wheelBL', { diameter: wheelRadius * 2, height: wheelWidth, tessellation: 24 }, scene);
+    wheelBL.rotation.z = Math.PI / 2;
     wheelBL.setParent(body);
+    wheelBL.position = new Vector3(0.7, -0.8, 1.5);
 
-    // Переднее правое колесо колесо Зеленое 
-    const wheelBR = MeshBuilder.CreateCylinder('wheelBR', {
-      diameter: wheelRadius * 2,
-      height: wheelWidth,
-      tessellation: 24,
-    }, scene);
-    wheelBR.rotation.z = Math.PI / 2; // Поворот на 90 градусов по Z-оси
-    wheelBR.position = new Vector3(0.7, 0.5, -1.2);
+    const wheelBR = MeshBuilder.CreateCylinder('wheelBR', { diameter: wheelRadius * 2, height: wheelWidth, tessellation: 24 }, scene);
+    wheelBR.rotation.z = Math.PI / 2;
     wheelBR.setParent(body);
-
-    // Материал для колёс
-    const wheelMaterial = new StandardMaterial('wheelMat', scene);
-    wheelMaterial.diffuseColor = new Color3(0.1, 0.1, 0.1); // Чёрный цвет
+    wheelBR.position = new Vector3(-0.7, -0.8, 1.5);
     
-    // Материал для переднего левого колеса (красный)
+
+    // Материалы для колес (реалистичные)
     const wheelFLMaterial = new StandardMaterial('wheelFLMat', scene);
-    wheelFLMaterial.diffuseColor = new Color3(1, 0, 0); // Красный цвет
-    
-    // Материал для заднего левого колеса (синий)
+    wheelFLMaterial.diffuseColor = new Color3(0.2, 0.2, 0.2); // Темно-серый
+    wheelFLMaterial.specularColor = new Color3(0.1, 0.1, 0.1);
+    wheelFLMaterial.roughness = 0.9;
+    wheelFL.material = wheelFLMaterial;
+
     const wheelBLMaterial = new StandardMaterial('wheelBLMat', scene);
-    wheelBLMaterial.diffuseColor = new Color3(0, 0, 1); // Синий цвет
-    
-    // Материал для заднего правого колеса (зеленый)
+    wheelBLMaterial.diffuseColor = new Color3(0.2, 0.2, 0.2); // Темно-серый
+    wheelBLMaterial.specularColor = new Color3(0.1, 0.1, 0.1);
+    wheelBLMaterial.roughness = 0.9;
+    wheelBL.material = wheelBLMaterial;
+
     const wheelFRMaterial = new StandardMaterial('wheelFRMat', scene);
-    wheelFRMaterial.diffuseColor = new Color3(0, 1, 0); // Зеленый цвет
-    
-    // Применяем материалы
-    wheelFL.material = wheelFLMaterial; // Красное переднее левое колесо
-    wheelBL.material = wheelBLMaterial; // Синее заднее левое колесо
-    wheelFR.material = wheelFRMaterial; // Зеленое заднее правое колесо
-    wheelBR.material = wheelMaterial; // Чёрное заднее правое колесо
+    wheelFRMaterial.diffuseColor = new Color3(0.2, 0.2, 0.2); // Темно-серый
+    wheelFRMaterial.specularColor = new Color3(0.1, 0.1, 0.1);
+    wheelFRMaterial.roughness = 0.9;
+    wheelFR.material = wheelFRMaterial;
 
-    // Создаем стационарный красный цилиндр на плоскости
-    const redCylinder = MeshBuilder.CreateCylinder('redCylinder', {
-      diameter: 0.5,
-      height: 1,
-      tessellation: 16,
-    }, scene);
-    redCylinder.position = new Vector3(-10, 0.5, 0); // Стационарная позиция на левой стороне плоскости
-    redCylinder.rotation.x = Math.PI / 2; // Поворачиваем горизонтально
+    const wheelBRMaterial = new StandardMaterial('wheelBRMat', scene);
+    wheelBRMaterial.diffuseColor = new Color3(0.2, 0.2, 0.2); // Темно-серый
+    wheelBRMaterial.specularColor = new Color3(0.1, 0.1, 0.1);
+    wheelBRMaterial.roughness = 0.9;
+    wheelBR.material = wheelBRMaterial;
+
+    // Добавляем тени для колес
+    shadowGenerator.addShadowCaster(wheelFL);
+    shadowGenerator.addShadowCaster(wheelFR);
+    shadowGenerator.addShadowCaster(wheelBL);
+    shadowGenerator.addShadowCaster(wheelBR);
     
-    // Материал для красного цилиндра
+
+    const redCylinder = MeshBuilder.CreateCylinder('redCylinder', { diameter: 0.5, height: 1, tessellation: 16 }, scene);
+    redCylinder.position = new Vector3(-10, 10, 0); // 10 метров над землей для тестирования гравитации
+    redCylinder.rotation.x = Math.PI / 2;
     const redCylinderMaterial = new StandardMaterial('redCylinderMat', scene);
-    redCylinderMaterial.diffuseColor = new Color3(1, 0, 0); // Красный цвет
+    redCylinderMaterial.diffuseColor = new Color3(1, 0, 0);
     redCylinder.material = redCylinderMaterial;
-    
-    // НЕ прикрепляем к кузову - это стационарный объект
 
-    // Устанавливаем кузов как основной объект для управления
-    vehicle = body;
-
-    // Enable shadows for vehicle
-    shadowGenerator.addShadowCaster(vehicle);
+    shadowGenerator.addShadowCaster(body);
     shadowGenerator.addShadowCaster(redCylinder);
+    const ground = MeshBuilder.CreateGround('ground', { width: 100, height: 100 }, scene);
+    ground.receiveShadows = true;
+    const groundMaterial = new StandardMaterial('groundMaterial', scene);
+    groundMaterial.diffuseColor = new Color3(0.2, 0.6, 0.2);
+    groundMaterial.specularColor = new Color3(0.1, 0.1, 0.1);
+    ground.material = groundMaterial;
 
-    // Create physics bodies for static objects
-    const createPhysicsBodies = () => {
-      if (!physicsBodyFactoryRef.current) {
-        console.warn('Physics body factory not ready yet');
+
+    initializePhysics();
+
+    const pressedKeys = new Set<string>();
+    scene.onKeyboardObservable.add((kbInfo) => {
+      if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
+        pressedKeys.add(kbInfo.event.key.toLowerCase());
+      } else if (kbInfo.type === KeyboardEventTypes.KEYUP) {
+        pressedKeys.delete(kbInfo.event.key.toLowerCase());
+      }
+    });
+
+    scene.registerBeforeRender(() => {
+      if (!vehiclePhysicsSystemRef.current || !vehicleIdRef.current) {
         return;
       }
 
-      try {
-        // Create physics body for ground (static)
-        const groundPhysicsBody = physicsBodyFactoryRef.current.createGroundBody(ground, {
-          friction: 0.8,        // High friction for ground
-          restitution: 0.1,     // Low bounce
-          material: {
-            friction: 0.8,
-            restitution: 0.1,
-            rollingFriction: 0.1,
-            spinningFriction: 0.1
-          }
-        });
+      const deltaTime = engine.getDeltaTime() / 1000;
+      
+      let engineForce = 0;
+      let brakeForce = 0;
+      let steerAngle = 0;
 
-        // Create physics body for red cylinder (static)
-        const cylinderPhysicsBody = physicsBodyFactoryRef.current.createCylinderBody(redCylinder, {
-          friction: 0.6,        // Medium friction
-          restitution: 0.3,     // Medium bounce
-          material: {
-            friction: 0.6,
-            restitution: 0.3,
-            rollingFriction: 0.1,
-            spinningFriction: 0.1
-          }
-        });
+      // Обработка ввода
+      if (pressedKeys.has('w')) engineForce = 1;
+      if (pressedKeys.has('s')) engineForce = -1;
+      if (pressedKeys.has(' ')) brakeForce = 1;
+      if (pressedKeys.has('a')) steerAngle = -1;
+      if (pressedKeys.has('d')) steerAngle = 1;
 
-        // Register physics bodies with sync system
-        if (physicsSystemRef.current) {
-          physicsSystemRef.current.registerPhysicsObject(
-            groundPhysicsBody.id,
-            ground,
-            groundPhysicsBody.rigidBody
-          );
-          
-          physicsSystemRef.current.registerPhysicsObject(
-            cylinderPhysicsBody.id,
-            redCylinder,
-            cylinderPhysicsBody.rigidBody
-          );
-        }
-
-        console.log('✅ Physics bodies created for static objects');
-      } catch (error) {
-        console.error('❌ Error creating physics bodies:', error);
-      }
-    };
-
-    // Create physics bodies after a short delay to ensure physics system is ready
-    setTimeout(createPhysicsBodies, 100);
-
-    // Enable shadows on ground
-    ground.receiveShadows = true;
-
-    // Система отслеживания нажатых клавиш для комбинированного управления
-    const pressedKeys = new Set<string>();
-    
-    scene.onKeyboardObservable.add((kbInfo) => {
-      if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
-        pressedKeys.add(kbInfo.event.key);
-      } else if (kbInfo.type === KeyboardEventTypes.KEYUP) {
-        pressedKeys.delete(kbInfo.event.key);
-      }
-    });
-
-    // Обновление движения в каждом кадре
-    scene.registerBeforeRender(() => {
-      const targetMesh = vehicle ?? scene.getMeshByName('cube');
-      if (targetMesh) {
-        // Движение вперед/назад
-        if (pressedKeys.has('w')) {
-          targetMesh.translate(Vector3.Forward(), 0.5, Space.LOCAL);
-        }
-        if (pressedKeys.has('s')) {
-          targetMesh.translate(Vector3.Backward(), 0.5, Space.LOCAL);
-        }
-        
-        // Поворот автомобиля при движении
-        if (pressedKeys.has('w') && pressedKeys.has('a')) {
-          // Движение вперед + поворот влево
-          targetMesh.rotate(Vector3.Up(), -0.05, Space.LOCAL);
-        }
-        if (pressedKeys.has('w') && pressedKeys.has('d')) {
-          // Движение вперед + поворот вправо
-          targetMesh.rotate(Vector3.Up(), 0.05, Space.LOCAL);
-        }
-        if (pressedKeys.has('s') && pressedKeys.has('a')) {
-          // Движение назад + поворот влево (обратное направление)
-          targetMesh.rotate(Vector3.Up(), 0.05, Space.LOCAL);
-        }
-        if (pressedKeys.has('s') && pressedKeys.has('d')) {
-          // Движение назад + поворот вправо (обратное направление)
-          targetMesh.rotate(Vector3.Up(), -0.05, Space.LOCAL);
-        }
-        
-        // Поворот передних колес для визуального эффекта
-        if (pressedKeys.has('a')) {
-          // Поворачиваем передние колеса влево
-          const turnAngle = -Math.PI / 6; // 30 градусов в радианах
-          wheelFL.rotation.y = turnAngle;
-          wheelFR.rotation.y = turnAngle;
-        } else if (pressedKeys.has('d')) {
-          // Поворачиваем передние колеса вправо
-          const turnAngle = Math.PI / 6; // 30 градусов в радианах
-          wheelFL.rotation.y = turnAngle;
-          wheelFR.rotation.y = turnAngle;
-        } else {
-          // Возвращаем колеса в исходное положение
-          wheelFL.rotation.y = 0;
-          wheelFR.rotation.y = 0;
+      // Применяем управление только если есть активные клавиши
+      if (engineForce !== 0 || brakeForce !== 0 || steerAngle !== 0) {
+        if (vehiclePhysicsSystemRef.current.hasVehicle(vehicleIdRef.current)) {
+          vehiclePhysicsSystemRef.current.applyControl(vehicleIdRef.current, { 
+            engineForce, 
+            brakeForce, 
+            steerAngle 
+          });
+          vehiclePhysicsSystemRef.current.updateVehicle(vehicleIdRef.current, deltaTime);
         }
       }
     });
 
-    // Handle window resize
-    const handleResize = () => {
-      engine.resize();
-    };
+    engine.runRenderLoop(() => {
+      if (physicsSystemRef.current) {
+        const deltaTime = engine.getDeltaTime() / 1000;
+        physicsSystemRef.current.update(deltaTime);
+      }
+      scene.render();
+    });
 
+    const handleResize = () => engine.resize();
     window.addEventListener('resize', handleResize);
 
-           // Start render loop
-           engine.runRenderLoop(() => {
-             // Update physics system
-             if (physicsSystemRef.current) {
-               const deltaTime = engine.getDeltaTime() / 1000; // Convert to seconds
-               physicsSystemRef.current.update(deltaTime);
-             }
-             
-             scene.render();
-           });
-
-    // Cleanup function
     return () => {
       window.removeEventListener('resize', handleResize);
-      
-      // Cleanup physics system
+      if (vehiclePhysicsSystemRef.current) {
+        vehiclePhysicsSystemRef.current.dispose();
+        vehiclePhysicsSystemRef.current = null;
+      }
       if (physicsSystemRef.current) {
         physicsSystemRef.current.dispose();
         physicsSystemRef.current = null;
       }
-      
       engine.dispose();
     };
-  }, []);
+  }, [isPhysicsReady]);
 
+  // Отдельный useEffect для создания объектов при изменении isPhysicsReady
+  useEffect(() => {
+    if (isPhysicsReady && sceneRef.current && engineRef.current) {
+      setTimeout(() => {
+        createVehiclePhysics();
+        createPhysicsBodies();
+      }, 100);
+    }
+  }, [isPhysicsReady]);
 
   return (
     <div className="gameplay-page">
-      {/* 3D Canvas */}
-      <canvas
-        ref={canvasRef}
-        className="babylon-canvas"
-      />
-
-      {/* UI Overlay */}
+      <canvas ref={canvasRef} className="babylon-canvas" />
       <div className="gameplay-ui">
-        <button
-          className="back-button"
-          onClick={onBackToMenu}
-          type="button"
-        >
+        <button className="back-button" onClick={onBackToMenu} type="button">
           ← Back to Menu
         </button>
-        
       </div>
     </div>
   );

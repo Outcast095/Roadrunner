@@ -5,4 +5,6 @@ export * from './PhysicsUpdateSystem';
 export * from './PhysicsSyncSystem';
 export * from './PhysicsSystem';
 export * from './PhysicsBodies';
-// export * from './VehiclePhysics'; // Временно отключено для отладки
+export * from './SuspensionSystem';
+export * from './VehiclePhysicsSystem';
+export * from './OffroadVehicleConfig';

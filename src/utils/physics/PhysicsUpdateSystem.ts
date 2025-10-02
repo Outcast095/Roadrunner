@@ -103,6 +103,8 @@ export class PhysicsUpdateSystem {
         return;
       }
 
+      // PhysicsUpdateSystem update
+
       // Обновляем аккумулятор времени
       this.accumulator += deltaTime;
       
@@ -120,6 +122,8 @@ export class PhysicsUpdateSystem {
         this.accumulator -= this.config.fixedTimeStep;
         subSteps++;
       }
+
+      // PhysicsUpdateSystem step completed
 
       // Обновляем статистику
       this.updateStats(startTime, subSteps);

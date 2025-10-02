@@ -7,8 +7,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    host: true, // Слушать на всех интерфейсах
     open: true,
-    strictPort: true,
+    strictPort: false, // Позволить использовать другой порт если 3000 занят
     fs: {
       allow: ['..', 'node_modules']
     }

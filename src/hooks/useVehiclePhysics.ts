@@ -6,7 +6,8 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import { AbstractMesh, Vector3 } from '@babylonjs/core';
-import { VehiclePhysicsSystem, VehicleConfig, VehiclePhysics } from '../utils/physics';
+import { VehiclePhysicsSystem } from '../utils/physics';
+import type { VehicleConfig, VehiclePhysics } from '../utils/physics';
 
 export interface VehicleControls {
   engineForce: number;    // Сила двигателя (-1 до 1)

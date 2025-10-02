@@ -3,7 +3,7 @@
  * Система синхронизации физики с визуальным представлением
  */
 
-import { AbstractMesh } from '@babylonjs/core';
+import { AbstractMesh, Quaternion, Vector3 } from '@babylonjs/core';
 import { PhysicsManager } from './PhysicsManager';
 import { PhysicsUpdateSystem } from './PhysicsUpdateSystem';
 
@@ -113,6 +113,8 @@ export class PhysicsSyncSystem {
     rigidBody: any
   ): void {
     try {
+    // PhysicsSyncSystem registering object
+      
       const physicsObject: PhysicsObject = {
         mesh,
         rigidBody,
@@ -126,9 +128,7 @@ export class PhysicsSyncSystem {
       this.physicsObjects.set(id, physicsObject);
       this.stats.syncedObjects = this.physicsObjects.size;
       
-      if (this.config.debugMode) {
-        console.log(`✅ Physics object registered: ${id}`);
-      }
+      // PhysicsSyncSystem object registered
       
     } catch (error) {
       this.addSyncError(`Failed to register physics object ${id}: ${error}`);
@@ -166,10 +166,16 @@ export class PhysicsSyncSystem {
         return;
       }
 
+    // PhysicsSyncSystem sync started
+
       // Синхронизируем все объекты
+      let syncedCount = 0;
       for (const [id, physicsObject] of this.physicsObjects) {
         this.syncObject(physicsObject, deltaTime);
+        syncedCount++;
       }
+      
+      // PhysicsSyncSystem sync completed
       
       // Обновляем статистику
       this.updateStats(startTime);
@@ -198,9 +204,66 @@ export class PhysicsSyncSystem {
       const { mesh, rigidBody } = physicsObject;
       
       // Получаем трансформацию из физики
-      const transform = rigidBody.getWorldTransform();
-      const position = transform.getOrigin();
-      const rotation = transform.getRotation();
+      let transform, position, rotation;
+      
+      // Проверяем, является ли это RaycastVehicle (автомобиль)
+      if (rigidBody.getRigidBody && typeof rigidBody.getRigidBody === 'function') {
+        // Это RaycastVehicle - получаем rigidBody из него
+        const vehicleRigidBody = rigidBody.getRigidBody();
+        if (vehicleRigidBody && vehicleRigidBody.getWorldTransform) {
+          transform = vehicleRigidBody.getWorldTransform();
+          if (transform && transform.getOrigin && transform.getRotation) {
+            position = transform.getOrigin();
+            rotation = transform.getRotation();
+            
+            // ПЛАВНАЯ СИНХРОНИЗАЦИЯ С LERP ДЛЯ АВТОМОБИЛЯ
+            const physicsPos = new Vector3(position.x(), position.y(), position.z());
+            const physicsRot = new Quaternion(rotation.x(), rotation.y(), rotation.z(), rotation.w());
+            
+            // Коэффициент интерполяции (0 = текущая позиция, 1 = физическая позиция)
+            const lerpFactor = 0.15; // Плавная интерполяция (чем меньше, тем плавнее)
+            
+            // Применяем линейную интерполяцию (LERP) для позиции
+            mesh.position.x = this.lerp(mesh.position.x, physicsPos.x, lerpFactor);
+            mesh.position.y = this.lerp(mesh.position.y, physicsPos.y, lerpFactor);
+            mesh.position.z = this.lerp(mesh.position.z, physicsPos.z, lerpFactor);
+            
+            // Применяем сферическую интерполяцию (SLERP) для вращения
+            if (!mesh.rotationQuaternion) {
+              mesh.rotationQuaternion = new Quaternion(0, 0, 0, 1);
+            }
+            Quaternion.SlerpToRef(
+              mesh.rotationQuaternion,
+              physicsRot,
+              lerpFactor,
+              mesh.rotationQuaternion
+            );
+            
+            return; // Выходим после плавной синхронизации
+          } else {
+            console.warn(`⚠️ Vehicle ${physicsObject.id}: Invalid transform from vehicle rigidBody`);
+            return; // Пропускаем синхронизацию если нет валидной трансформации
+          }
+        } else {
+          console.warn(`⚠️ Vehicle ${physicsObject.id}: Invalid vehicle rigidBody`);
+          return; // Пропускаем синхронизацию если нет валидного rigidBody
+        }
+      } else {
+        // Это обычный btRigidBody
+        if (rigidBody.getWorldTransform) {
+          transform = rigidBody.getWorldTransform();
+          if (transform && transform.getOrigin && transform.getRotation) {
+            position = transform.getOrigin();
+            rotation = transform.getRotation();
+          } else {
+            console.warn(`⚠️ Object ${physicsObject.id}: Invalid transform from rigidBody`);
+            return; // Пропускаем синхронизацию если нет валидной трансформации
+          }
+        } else {
+          console.warn(`⚠️ Object ${physicsObject.id}: No getWorldTransform method available`);
+          return; // Пропускаем синхронизацию если нет метода трансформации
+        }
+      }
       
       // Применяем интерполяцию если включена
       if (this.config.enableInterpolation) {
@@ -265,7 +328,7 @@ export class PhysicsSyncSystem {
       factor
     );
     
-    mesh.rotationQuaternion = new (mesh.getScene().getEngine().constructor as any).Quaternion(
+    mesh.rotationQuaternion = new Quaternion(
       interpolatedRot.x,
       interpolatedRot.y,
       interpolatedRot.z,
@@ -284,7 +347,7 @@ export class PhysicsSyncSystem {
    */
   private applyDirectTransform(mesh: AbstractMesh, position: any, rotation: any): void {
     mesh.position.set(position.x(), position.y(), position.z());
-    mesh.rotationQuaternion = new (mesh.getScene().getEngine().constructor as any).Quaternion(
+    mesh.rotationQuaternion = new Quaternion(
       rotation.x(),
       rotation.y(),
       rotation.z(),

@@ -9,12 +9,9 @@ import { PhysicsSyncSystem } from './PhysicsSyncSystem';
 import { AmmoLoader } from './AmmoLoader';
 
 export interface PhysicsSystemConfig {
-  // Настройки физического мира
   gravity: { x: number; y: number; z: number };
   timeStep: number;
   maxSubSteps: number;
-  
-  // Настройки обновления
   updateConfig: {
     fixedTimeStep: number;
     maxSubSteps: number;
@@ -27,8 +24,6 @@ export interface PhysicsSystemConfig {
     logPerformance: boolean;
     maxLogFrequency: number;
   };
-  
-  // Настройки синхронизации
   syncConfig: {
     enableInterpolation: boolean;
     interpolationFactor: number;
@@ -43,31 +38,25 @@ export interface PhysicsSystemConfig {
 }
 
 export interface PhysicsSystemStats {
-  // Статистика системы
   isInitialized: boolean;
   isRunning: boolean;
   frameCount: number;
   totalTime: number;
-  
-  // Статистика подсистем
   physicsManager: any;
   updateSystem: any;
   syncSystem: any;
-  
-  // Общая производительность
   averageFrameTime: number;
   maxFrameTime: number;
   minFrameTime: number;
 }
 
 export class PhysicsSystem {
-  private physicsManager: PhysicsManager;
-  private updateSystem: PhysicsUpdateSystem;
-  private syncSystem: PhysicsSyncSystem;
+  private physicsManager!: PhysicsManager;
+  private updateSystem!: PhysicsUpdateSystem;
+  private syncSystem!: PhysicsSyncSystem;
   private config: PhysicsSystemConfig;
   private stats: PhysicsSystemStats;
-  
-  // Состояние системы
+
   private isInitialized: boolean = false;
   private isRunning: boolean = false;
   private frameCount: number = 0;
@@ -77,7 +66,7 @@ export class PhysicsSystem {
 
   constructor(config?: Partial<PhysicsSystemConfig>) {
     this.config = {
-      gravity: { x: 0, y: -9.8, z: 0 },
+      gravity: { x: 0, y: -9.81, z: 0 },
       timeStep: 1/60,
       maxSubSteps: 10,
       updateConfig: {
@@ -105,7 +94,7 @@ export class PhysicsSystem {
       },
       ...config
     };
-    
+
     this.stats = {
       isInitialized: false,
       isRunning: false,
@@ -120,229 +109,163 @@ export class PhysicsSystem {
     };
   }
 
-  /**
-   * Инициализация системы физики
-   */
   async initialize(): Promise<void> {
     try {
-      // Загружаем Ammo.js
       const ammoLoader = AmmoLoader.getInstance();
       const ammo = await ammoLoader.load();
-      
-      // Создаем менеджер физики
+      if (!ammo || !ammo.btDefaultCollisionConfiguration) {
+        throw new Error('Invalid Ammo.js object');
+      }
+
       this.physicsManager = new PhysicsManager({
         gravity: this.config.gravity,
         timeStep: this.config.timeStep,
-        maxSubSteps: this.config.maxSubSteps
+        maxSubSteps: this.config.maxSubSteps,
+        debugMode: this.config.updateConfig.debugMode
       });
-      
-      await this.physicsManager.initialize(ammo);
-      
-      // Создаем систему обновления
-      this.updateSystem = new PhysicsUpdateSystem(
-        this.physicsManager,
-        this.config.updateConfig
-      );
-      
-      // Создаем систему синхронизации
-      this.syncSystem = new PhysicsSyncSystem(
-        this.physicsManager,
-        this.updateSystem,
-        this.config.syncConfig
-      );
-      
-      // Настраиваем callbacks
+
+      this.physicsManager.initialize(ammo);
+      this.updateSystem = new PhysicsUpdateSystem(this.physicsManager, this.config.updateConfig);
+      this.syncSystem = new PhysicsSyncSystem(this.physicsManager, this.updateSystem, this.config.syncConfig);
       this.setupCallbacks();
-      
-      // Обновляем состояние
       this.isInitialized = true;
       this.stats.isInitialized = true;
-      
-      console.log('✅ Physics System initialized successfully');
-      
     } catch (error) {
       console.error('❌ Physics System initialization failed:', error);
       throw error;
     }
   }
 
-  /**
-   * Настройка callbacks
-   */
   private setupCallbacks(): void {
-    // Callback для обновления
     this.updateSystem.onUpdate((deltaTime: number) => {
       this.syncSystem.sync(deltaTime);
     });
-    
-    // Callback для ошибок
+
     this.updateSystem.onError((error: string) => {
-      console.error('Physics Update Error:', error);
+      console.error('❌ Physics Update Error:', error);
     });
-    
+
     this.updateSystem.onWarning((warning: string) => {
-      console.warn('Physics Update Warning:', warning);
+      console.warn('⚠️ Physics Update Warning:', warning);
     });
   }
 
-  /**
-   * Запуск системы физики
-   */
   start(): void {
     if (!this.isInitialized) {
       throw new Error('Physics System not initialized');
     }
-    
+
     this.isRunning = true;
     this.stats.isRunning = true;
     this.startTime = performance.now();
     this.lastFrameTime = this.startTime;
-    
-    console.log('🚀 Physics System started');
+    // Physics System started
   }
 
-  /**
-   * Остановка системы физики
-   */
   stop(): void {
     this.isRunning = false;
     this.stats.isRunning = false;
-    
-    console.log('⏹️ Physics System stopped');
+    // Physics System stopped
   }
 
-  /**
-   * Обновление системы физики
-   */
   update(deltaTime: number): void {
     if (!this.isRunning || !this.isInitialized) {
       return;
     }
-    
+
     const frameStartTime = performance.now();
-    
+
     try {
-      // Обновляем систему обновления
+      // Обновление физических тел
       this.updateSystem.update(deltaTime);
       
-      // Обновляем статистику
-      this.updateStats(frameStartTime);
+      // Синхронизация с визуальными объектами
+      this.syncSystem.sync(deltaTime);
       
+      this.updateStats(frameStartTime);
     } catch (error) {
-      console.error('Physics System update failed:', error);
+      console.error('❌ Physics System update failed:', error);
     }
   }
 
-  /**
-   * Обновление статистики
-   */
   private updateStats(frameStartTime: number): void {
     const frameEndTime = performance.now();
     const frameTime = frameEndTime - frameStartTime;
-    
+
     this.frameCount++;
     this.stats.frameCount = this.frameCount;
     this.stats.totalTime = frameEndTime - this.startTime;
-    
-    // Обновляем статистику времени кадра
+
     this.frameTimes.push(frameTime);
     if (this.frameTimes.length > 60) {
-      this.frameTimes = this.frameTimes.slice(-60); // Храним только последние 60 кадров
+      this.frameTimes = this.frameTimes.slice(-60);
     }
-    
+
     this.stats.averageFrameTime = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
     this.stats.maxFrameTime = Math.max(this.stats.maxFrameTime, frameTime);
     this.stats.minFrameTime = Math.min(this.stats.minFrameTime, frameTime);
-    
-    // Обновляем статистику подсистем
+
     this.stats.physicsManager = this.physicsManager.getDebugInfo();
     this.stats.updateSystem = this.updateSystem.getStats();
     this.stats.syncSystem = this.syncSystem.getStats();
   }
 
-  /**
-   * Регистрация физического объекта
-   */
   registerPhysicsObject(id: string, mesh: any, rigidBody: any): void {
     if (!this.isInitialized) {
       throw new Error('Physics System not initialized');
     }
     
+    // Registering physics object
+    
     this.syncSystem.registerPhysicsObject(id, mesh, rigidBody);
+    
+    // Physics object registered
   }
 
-  /**
-   * Отмена регистрации физического объекта
-   */
   unregisterPhysicsObject(id: string): void {
     if (!this.isInitialized) {
       return;
     }
-    
     this.syncSystem.unregisterPhysicsObject(id);
+    // Physics object unregistered
   }
 
-  /**
-   * Получение менеджера физики
-   */
   getPhysicsManager(): PhysicsManager {
     return this.physicsManager;
   }
 
-  /**
-   * Получение системы обновления
-   */
   getUpdateSystem(): PhysicsUpdateSystem {
     return this.updateSystem;
   }
 
-  /**
-   * Получение системы синхронизации
-   */
   getSyncSystem(): PhysicsSyncSystem {
     return this.syncSystem;
   }
 
-  /**
-   * Получение статистики
-   */
   getStats(): PhysicsSystemStats {
     return { ...this.stats };
   }
 
-  /**
-   * Получение конфигурации
-   */
   getConfig(): PhysicsSystemConfig {
     return { ...this.config };
   }
 
-  /**
-   * Обновление конфигурации
-   */
   updateConfig(newConfig: Partial<PhysicsSystemConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    
+
     if (this.physicsManager) {
-      this.physicsManager.setGravity(
-        this.config.gravity.x,
-        this.config.gravity.y,
-        this.config.gravity.z
-      );
+      this.physicsManager.setGravity(this.config.gravity.x, this.config.gravity.y, this.config.gravity.z);
     }
-    
+
     if (this.updateSystem) {
       this.updateSystem.updateConfig(this.config.updateConfig);
     }
-    
+
     if (this.syncSystem) {
       this.syncSystem.updateConfig(this.config.syncConfig);
     }
   }
 
-  /**
-   * Сброс статистики
-   */
   resetStats(): void {
     this.stats = {
       isInitialized: this.isInitialized,
@@ -356,49 +279,46 @@ export class PhysicsSystem {
       maxFrameTime: 0,
       minFrameTime: Infinity
     };
-    
+
     this.frameCount = 0;
     this.startTime = performance.now();
     this.lastFrameTime = this.startTime;
     this.frameTimes = [];
-    
+
     if (this.updateSystem) {
       this.updateSystem.resetStats();
     }
-    
+
     if (this.syncSystem) {
       this.syncSystem.resetStats();
     }
   }
 
-  /**
-   * Проверка инициализации
-   */
   isReady(): boolean {
     return this.isInitialized && this.isRunning;
   }
 
-  /**
-   * Очистка ресурсов
-   */
+  getInitialized(): boolean {
+    return this.isInitialized;
+  }
+
   dispose(): void {
     this.stop();
-    
+
     if (this.syncSystem) {
       this.syncSystem.dispose();
     }
-    
+
     if (this.updateSystem) {
       this.updateSystem.dispose();
     }
-    
+
     if (this.physicsManager) {
       this.physicsManager.dispose();
     }
-    
+
     this.isInitialized = false;
     this.stats.isInitialized = false;
-    
-    console.log('🧹 Physics System disposed');
+    // Physics System disposed
   }
 }

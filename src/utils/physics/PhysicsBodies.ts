@@ -58,10 +58,11 @@ export class PhysicsBodyFactory {
       mass: 0,                     // Статичное тело
       friction: 0.8,               // Высокое трение
       restitution: 0.1,            // Низкая упругость
-      linearDamping: 0.0,
-      angularDamping: 0.0,
-      isKinematic: false,
-      isTrigger: false,
+      linearDamping: 0.0,         //0.0 = нет затухания - объект движется с постоянной скоростью
+      angularDamping: 0.0,        //0.0 = нет затухания - объект вращается с постоянной скоростью
+      isKinematic: false, //false = обычное тело - подчиняется физическим законам 
+                          // true = кинематическое - можно двигать кодом, но не силами физики
+      isTrigger: false, //false = обычное тело - создает столкновения и останавливает объекты
       collisionGroup: 1,
       collisionMask: -1,
       material: {
@@ -98,7 +99,7 @@ export class PhysicsBodyFactory {
     config?: Partial<PhysicsBodyConfig>
   ): PhysicsBody {
     const defaultConfig: PhysicsBodyConfig = {
-      mass: 0,                     // Статичное тело
+      mass: 1,                     // Динамичное тело по умолчанию
       friction: 0.6,               // Среднее трение
       restitution: 0.3,            // Средняя упругость
       linearDamping: 0.0,
